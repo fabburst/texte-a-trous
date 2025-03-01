@@ -386,9 +386,6 @@
                 themeIcon.textContent = '☀️';
                 themeText.textContent = 'Mode sombre';
             }
-            
-            // Préparation de l'interface
-            document.getElementById('text-area').innerHTML = "<p style='text-align: center; padding: 30px; color: var(--primary-color);'>Votre texte apparaîtra ici après avoir cliqué sur \"Charger ce texte\".</p>";
         };
         
         // Fonction pour ouvrir un onglet
@@ -430,29 +427,81 @@
             const selectionArea = document.getElementById('selection-area');
             selectionArea.innerHTML = '';
             
-            // Diviser le texte en mots et créer des éléments span pour chaque mot
-            originalWords = text.split(/\s+/);
+            // Préserver la structure du texte en divisant d'abord par les retours à la ligne
+            const paragraphs = text.split(/\r?\n/);
             
-            originalWords.forEach((word, index) => {
-                const span = document.createElement('span');
-                span.className = 'word';
-                span.textContent = word;
-                span.dataset.index = index;
-                span.dataset.original = word;
-                
-                // Ajouter un gestionnaire d'événements pour transformer le mot en trou
-                span.addEventListener('click', function() {
-                    this.style.backgroundColor = '#90EE90';
-                    if (!holesIndices.includes(index)) {
-                        holesIndices.push(index);
+            // Traiter chaque paragraphe
+            let wordIndex = 0;
+            originalWords = [];
+            
+            paragraphs.forEach((paragraph, paragraphIndex) => {
+                if (paragraph.trim() === '') {
+                    // Paragraphe vide (juste un retour à la ligne)
+                    const br = document.createElement('br');
+                    selectionArea.appendChild(br);
+                    
+                    // Ajouter un autre saut de ligne pour l'espacement
+                    if (paragraphIndex < paragraphs.length - 1) {
+                        selectionArea.appendChild(document.createElement('br'));
                     }
-                });
-                
-                selectionArea.appendChild(span);
-                
-                // Ajouter un espace après chaque mot (sauf le dernier)
-                if (index < originalWords.length - 1) {
-                    selectionArea.appendChild(document.createTextNode(' '));
+                } else {
+                    // Détecter si c'est une liste (commence par - ou * ou 1.)
+                    const isListItem = /^\s*[-*]|\d+\./.test(paragraph);
+                    const trimmedParagraph = paragraph.trim();
+                    
+                    // Diviser le paragraphe en mots
+                    const words = paragraph.split(/\s+/);
+                    
+                    // Si c'est un élément de liste, préserver le marqueur
+                    if (isListItem) {
+                        const listMarker = trimmedParagraph.match(/^\s*[-*]|\d+\./)[0];
+                        const span = document.createElement('span');
+                        span.textContent = listMarker + ' ';
+                        selectionArea.appendChild(span);
+                        
+                        // Ajuster les mots pour ne pas inclure le marqueur
+                        const markerLength = listMarker.length;
+                        const firstWordIndex = paragraph.indexOf(listMarker) + markerLength;
+                        const restOfParagraph = paragraph.substring(firstWordIndex).trim();
+                        words.splice(0, words.indexOf(restOfParagraph.split(/\s+/)[0]));
+                    }
+                    
+                    // Créer des éléments span pour chaque mot
+                    words.forEach((word, index) => {
+                        if (word.trim() === '') return;
+                        
+                        const span = document.createElement('span');
+                        span.className = 'word';
+                        span.textContent = word;
+                        span.dataset.index = wordIndex;
+                        span.dataset.original = word;
+                        
+                        // Ajouter un gestionnaire d'événements pour transformer le mot en trou
+                        span.addEventListener('click', function() {
+                            this.style.backgroundColor = '#90EE90';
+                            if (!holesIndices.includes(parseInt(this.dataset.index))) {
+                                holesIndices.push(parseInt(this.dataset.index));
+                            }
+                        });
+                        
+                        selectionArea.appendChild(span);
+                        originalWords.push(word);
+                        
+                        // Ajouter un espace après chaque mot (sauf le dernier du paragraphe)
+                        if (index < words.length - 1) {
+                            selectionArea.appendChild(document.createTextNode(' '));
+                        }
+                        
+                        wordIndex++;
+                    });
+                    
+                    // Ajouter un saut de ligne après chaque paragraphe (sauf le dernier)
+                    if (paragraphIndex < paragraphs.length - 1) {
+                        selectionArea.appendChild(document.createElement('br'));
+                        if (!isListItem) {
+                            selectionArea.appendChild(document.createElement('br'));
+                        }
+                    }
                 }
             });
         }
@@ -477,13 +526,21 @@
             // Trier les indices pour traiter les mots dans l'ordre
             holesIndices.sort((a, b) => a - b);
             
-            originalWords.forEach((word, index) => {
+            // Recréer la structure complète en utilisant le DOM
+            const selectionArea = document.getElementById('selection-area');
+            const clone = selectionArea.cloneNode(true);
+            
+            // Remplacer les mots sélectionnés par des trous
+            const wordElements = clone.querySelectorAll('.word');
+            wordElements.forEach((wordElement) => {
+                const index = parseInt(wordElement.dataset.index);
+                
                 if (holesIndices.includes(index)) {
                     // Créer un trou
                     const hole = document.createElement('span');
                     hole.className = 'hole';
                     hole.dataset.index = index;
-                    hole.dataset.original = word;
+                    hole.dataset.original = wordElement.dataset.original;
                     
                     const input = document.createElement('input');
                     input.type = 'text';
@@ -502,20 +559,17 @@
                     });
                     
                     hole.appendChild(input);
-                    testArea.appendChild(hole);
+                    wordElement.parentNode.replaceChild(hole, wordElement);
                     holes.push(hole);
                 } else {
-                    // Afficher le mot normal
+                    // Remplacer le mot sélectionnable par un texte normal
                     const span = document.createElement('span');
-                    span.textContent = word;
-                    testArea.appendChild(span);
-                }
-                
-                // Ajouter un espace après chaque mot (sauf le dernier)
-                if (index < originalWords.length - 1) {
-                    testArea.appendChild(document.createTextNode(' '));
+                    span.textContent = wordElement.textContent;
+                    wordElement.parentNode.replaceChild(span, wordElement);
                 }
             });
+            
+            testArea.appendChild(clone);
         }
         
         // Vérifier la réponse pour un trou
