@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application de Texte à Trous</title>
+    <style>
+        /* Thème Nord iOS */
+        :root {
+            --bg-color: #f5f7fa;
+            --text-color: #3b4252;
+            --primary-color: #5e81ac;
+            --primary-hover: #81a1c1;
+            --tab-bg: #e5e9f0;
+            --tab-border: #d8dee9;
+            --tab-active-bg: #5e81ac;
+            --tab-active-color: #eceff4;
+            --area-bg: #eceff4;
+            --area-border: #d8dee9;
+            --hole-bg: #e5e9f0;
+            --hole-border: #d8dee9;
+            --correct-bg: #a3be8c;
+            --correct-border: #8fbcbb;
+            --incorrect-bg: #bf616a;
+            --incorrect-border: #d08770;
+            --instructions-bg: #e5e9f0;
+            --score-bg: #b48ead;
+            --score-text: #eceff4;
+            --button-radius: 10px;
+            --input-radius: 10px;
+            --box-shadow: 0 2px 8px rgba(46, 52, 64, 0.1);
+            --transition: all 0.2s ease;
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        
+        body.dark-mode {
+            --bg-color: #2e3440;
+            --text-color: #eceff4;
+            --primary-color: #81a1c1;
+            --primary-hover: #88c0d0;
+            --tab-bg: #3b4252;
+            --tab-border: #434c5e;
+            --tab-active-bg: #81a1c1;
+            --tab-active-color: #eceff4;
+            --area-bg: #3b4252;
+            --area-border: #434c5e;
+            --hole-bg: #434c5e;
+            --hole-border: #4c566a;
+            --correct-bg: #4c6c43;
+            --correct-border: #4e7c74;
+            --incorrect-bg: #693e44;
+            --incorrect-border: #8a5d52;
+            --instructions-bg: #3b4252;
+            --score-bg: #704e75;
+            --score-text: #eceff4;
+        }
+        
+        body {
+            font-family: var(--font-family);
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: var(--transition);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        h1, h2, h3 {
+            font-weight: 600;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            gap: 8px;
+            background-color: var(--bg-color);
+            padding: 10px 0;
+            position: relative;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: var(--tab-bg);
+            border: none;
+            border-radius: var(--button-radius);
+            font-weight: 500;
+            font-size: 14px;
+            text-align: center;
+            transition: var(--transition);
+            box-shadow: var(--box-shadow);
+            flex: 1;
+        }
+        .tab.active {
+            background-color: var(--tab-active-bg);
+            color: var(--tab-active-color);
+            transform: translateY(-2px);
+        }
+        .tab-content {
+            display: none;
+            padding: 20px;
+            background-color: var(--area-bg);
+            border-radius: 16px;
+            box-shadow: var(--box-shadow);
+            transition: var(--transition);
+            margin-bottom: 20px;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .text-area {
+            line-height: 1.6;
+            padding: 20px;
+            background-color: var(--area-bg);
+            border-radius: 16px;
+            border: none;
+            min-height: 150px;
+            transition: var(--transition);
+            box-shadow: var(--box-shadow);
+        }
+        #custom-text-area {
+            width: 100%;
+            height: 150px;
+            padding: 15px;
+            margin-bottom: 15px;
+            font-size: 16px;
+            border: none;
+            border-radius: var(--input-radius);
+            background-color: var(--area-bg);
+            color: var(--text-color);
+            transition: var(--transition);
+            box-shadow: var(--box-shadow);
+            font-family: var(--font-family);
+            resize: vertical;
+        }
+        .word {
+            cursor: pointer;
+            padding: 4px 6px;
+            margin: 0 2px;
+            border-radius: 6px;
+            transition: var(--transition);
+            display: inline-block;
+        }
+        .word:hover {
+            background-color: var(--primary-color);
+            color: var(--tab-active-color);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(46, 52, 64, 0.15);
+        }
+        .hole {
+            display: inline-flex;
+            align-items: center;
+            min-width: 80px;
+            height: 32px;
+            background-color: var(--hole-bg);
+            border-radius: 8px;
+            padding: 0 10px;
+            margin: 0 2px 4px 2px;
+            border: none;
+            position: relative;
+            transition: var(--transition);
+            box-shadow: var(--box-shadow);
+            vertical-align: middle;
+        }
+        .hole input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            outline: none;
+            font-size: 16px;
+            color: var(--text-color);
+            font-family: var(--font-family);
+            padding: 4px 0;
+        }
+        .correct {
+            background-color: var(--correct-bg);
+            color: white;
+            box-shadow: 0 2px 8px rgba(163, 190, 140, 0.3);
+        }
+        .incorrect {
+            background-color: var(--incorrect-bg);
+            color: white;
+            box-shadow: 0 2px 8px rgba(191, 97, 106, 0.3);
+        }
+        .correction {
+            font-size: 14px;
+            opacity: 0.9;
+            font-weight: normal;
+        }
+        button {
+            padding: 12px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--button-radius);
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 15px;
+            transition: var(--transition);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            box-shadow: var(--box-shadow);
+            font-family: var(--font-family);
+        }
+        button:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(94, 129, 172, 0.3);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .score-panel {
+            padding: 25px;
+            background-color: var(--score-bg);
+            color: var(--score-text);
+            border-radius: 16px;
+            text-align: center;
+            margin-top: 25px;
+            transition: var(--transition);
+            box-shadow: var(--box-shadow);
+        }
+        .instructions {
+            background-color: var(--instructions-bg);
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            line-height: 1.6;
+            transition: var(--transition);
+            box-shadow: var(--box-shadow);
+        }
+        .result-button {
+            display: block;
+            margin: 25px auto;
+            padding: 14px 30px;
+            font-size: 18px;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+            box-shadow: 0 4px 12px rgba(94, 129, 172, 0.3);
+            border-radius: 12px;
+        }
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            background-color: var(--tab-bg);
+            padding: 8px 16px;
+            border-radius: 20px;
+            box-shadow: var(--box-shadow);
+            transition: var(--transition);
+            z-index: 100;
+        }
+        .theme-toggle:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(46, 52, 64, 0.2);
+        }
+        .theme-toggle-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            margin-right: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--tab-active-color);
+            font-size: 16px;
+            transition: var(--transition);
+        }
+        
+        /* Header style */
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--primary-color);
+            color: var(--primary-color);
+            letter-spacing: 0.5px;
+        }
+        .result-button {
+            display: block;
+            margin: 20px auto;
+            padding: 12px 24px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="theme-toggle" onclick="toggleTheme()">
+        <div class="theme-toggle-icon">
+            <span id="theme-icon">☀️</span>
+        </div>
+        <span id="theme-text">Mode sombre</span>
+    </div>
+    <h1>Application de Texte à Trous</h1>
+    
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" onclick="openTab('tab1')">1. Copier le texte</div>
+            <div class="tab" onclick="openTab('tab2')">2. Sélectionner les mots</div>
+            <div class="tab" onclick="openTab('tab3')">3. Remplir les trous</div>
+        </div>
+        
+        <!-- Onglet 1: Copier le texte -->
+        <div id="tab1" class="tab-content active">
+            <div class="instructions">
+                <h3>Étape 1: Copier votre texte</h3>
+                <p>Copiez et collez votre texte dans la zone ci-dessous, puis cliquez sur "Charger ce texte".</p>
+            </div>
+            <textarea id="custom-text-area" placeholder="Copiez et collez votre texte ici..."></textarea>
+            <button onclick="loadCustomText()">Charger ce texte</button>
+        </div>
+        
+        <!-- Onglet 2: Sélectionner les mots -->
+        <div id="tab2" class="tab-content">
+            <div class="instructions">
+                <h3>Étape 2: Sélectionner les mots</h3>
+                <p>Cliquez sur les mots que vous voulez transformer en trous.</p>
+            </div>
+            <div id="selection-area" class="text-area"></div>
+            <button onclick="goToTestTab()">Passer à l'étape de test</button>
+        </div>
+        
+        <!-- Onglet 3: Remplir les trous -->
+        <div id="tab3" class="tab-content">
+            <div class="instructions">
+                <h3>Étape 3: Remplir les trous</h3>
+                <p>Tapez les mots manquants dans les trous. La case devient verte si la réponse est correcte, rouge si elle est incorrecte.</p>
+            </div>
+            <div id="test-area" class="text-area"></div>
+            <button class="result-button" onclick="showScore()">RÉSULTAT</button>
+            
+            <div id="score-panel" class="score-panel" style="display: none;">
+                <h2>Votre score</h2>
+                <p id="score-result"></p>
+                <p id="score-percentage"></p>
+                <button onclick="resetAll()">Recommencer</button>
+            <p class="instructions-note" style="margin-top: 15px; font-style: italic;">Note: Les bonnes réponses sont affichées entre parenthèses à côté des réponses incorrectes.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let originalWords = [];
+        let holes = [];
+        let holesIndices = [];
+        
+        // Fonction pour basculer entre les modes clair et sombre
+        function toggleTheme() {
+            const body = document.body;
+            const themeIcon = document.getElementById('theme-icon');
+            const themeText = document.getElementById('theme-text');
+            
+            body.classList.toggle('dark-mode');
+            
+            if (body.classList.contains('dark-mode')) {
+                themeIcon.textContent = '🌙';
+                themeText.textContent = 'Mode clair';
+                localStorage.setItem('theme', 'dark');
+            } else {
+                themeIcon.textContent = '☀️';
+                themeText.textContent = 'Mode sombre';
+                localStorage.setItem('theme', 'light');
+            }
+        }
+        
+        // Appliquer le thème au chargement de la page
+        window.onload = function() {
+            const savedTheme = localStorage.getItem('theme');
+            const themeIcon = document.getElementById('theme-icon');
+            const themeText = document.getElementById('theme-text');
+            
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+                themeIcon.textContent = '🌙';
+                themeText.textContent = 'Mode clair';
+            } else {
+                themeIcon.textContent = '☀️';
+                themeText.textContent = 'Mode sombre';
+            }
+            
+            // Préparation de l'interface
+            document.getElementById('text-area').innerHTML = "<p style='text-align: center; padding: 30px; color: var(--primary-color);'>Votre texte apparaîtra ici après avoir cliqué sur \"Charger ce texte\".</p>";
+        };
+        
+        // Fonction pour ouvrir un onglet
+        function openTab(tabId) {
+            // Masquer tous les onglets
+            const tabContents = document.getElementsByClassName('tab-content');
+            for (let i = 0; i < tabContents.length; i++) {
+                tabContents[i].classList.remove('active');
+            }
+            
+            // Désactiver tous les boutons d'onglet
+            const tabs = document.getElementsByClassName('tab');
+            for (let i = 0; i < tabs.length; i++) {
+                tabs[i].classList.remove('active');
+            }
+            
+            // Afficher l'onglet sélectionné
+            document.getElementById(tabId).classList.add('active');
+            
+            // Activer le bouton de l'onglet sélectionné
+            const activeTabIndex = tabId.slice(-1) - 1;
+            tabs[activeTabIndex].classList.add('active');
+        }
+        
+        // Charger un texte personnalisé
+        function loadCustomText() {
+            const customText = document.getElementById('custom-text-area').value.trim();
+            if (customText) {
+                resetAll();
+                loadTextForSelection(customText);
+                openTab('tab2');
+            } else {
+                alert("Veuillez entrer un texte.");
+            }
+        }
+        
+        // Charger le texte pour la sélection
+        function loadTextForSelection(text) {
+            const selectionArea = document.getElementById('selection-area');
+            selectionArea.innerHTML = '';
+            
+            // Diviser le texte en mots et créer des éléments span pour chaque mot
+            originalWords = text.split(/\s+/);
+            
+            originalWords.forEach((word, index) => {
+                const span = document.createElement('span');
+                span.className = 'word';
+                span.textContent = word;
+                span.dataset.index = index;
+                span.dataset.original = word;
+                
+                // Ajouter un gestionnaire d'événements pour transformer le mot en trou
+                span.addEventListener('click', function() {
+                    this.style.backgroundColor = '#90EE90';
+                    if (!holesIndices.includes(index)) {
+                        holesIndices.push(index);
+                    }
+                });
+                
+                selectionArea.appendChild(span);
+                
+                // Ajouter un espace après chaque mot (sauf le dernier)
+                if (index < originalWords.length - 1) {
+                    selectionArea.appendChild(document.createTextNode(' '));
+                }
+            });
+        }
+        
+        // Passer à l'onglet de test
+        function goToTestTab() {
+            if (holesIndices.length === 0) {
+                alert("Veuillez sélectionner au moins un mot à transformer en trou.");
+                return;
+            }
+            
+            createTestArea();
+            openTab('tab3');
+        }
+        
+        // Créer la zone de test avec les trous
+        function createTestArea() {
+            const testArea = document.getElementById('test-area');
+            testArea.innerHTML = '';
+            holes = [];
+            
+            // Trier les indices pour traiter les mots dans l'ordre
+            holesIndices.sort((a, b) => a - b);
+            
+            originalWords.forEach((word, index) => {
+                if (holesIndices.includes(index)) {
+                    // Créer un trou
+                    const hole = document.createElement('span');
+                    hole.className = 'hole';
+                    hole.dataset.index = index;
+                    hole.dataset.original = word;
+                    
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.placeholder = '...';
+                    
+                    // Vérifier la réponse quand l'utilisateur quitte l'input
+                    input.addEventListener('blur', function() {
+                        verifyAnswer(hole);
+                    });
+                    
+                    // Vérifier la réponse quand l'utilisateur appuie sur Entrée
+                    input.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') {
+                            verifyAnswer(hole);
+                        }
+                    });
+                    
+                    hole.appendChild(input);
+                    testArea.appendChild(hole);
+                    holes.push(hole);
+                } else {
+                    // Afficher le mot normal
+                    const span = document.createElement('span');
+                    span.textContent = word;
+                    testArea.appendChild(span);
+                }
+                
+                // Ajouter un espace après chaque mot (sauf le dernier)
+                if (index < originalWords.length - 1) {
+                    testArea.appendChild(document.createTextNode(' '));
+                }
+            });
+        }
+        
+        // Vérifier la réponse pour un trou
+        function verifyAnswer(hole) {
+            const input = hole.querySelector('input');
+            const userAnswer = input.value.trim();
+            const correctAnswer = hole.dataset.original;
+            
+            // Nettoyer les classes précédentes
+            hole.classList.remove('correct', 'incorrect');
+            
+            // Vérifier si la réponse est correcte
+            if (userAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
+                hole.classList.add('correct');
+            } else if (userAnswer) {
+                hole.classList.add('incorrect');
+            }
+        }
+        
+        // Vérifier toutes les réponses et afficher le score
+        function showScore() {
+            let correct = 0;
+            let total = holes.length;
+            
+            holes.forEach(hole => {
+                const input = hole.querySelector('input');
+                const userAnswer = input.value.trim();
+                const correctAnswer = hole.dataset.original;
+                
+                // Nettoyer les classes précédentes
+                hole.classList.remove('correct', 'incorrect');
+                
+                // Vérifier si la réponse est correcte
+                if (userAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
+                    hole.classList.add('correct');
+                    correct++;
+                } else if (userAnswer) {
+                    hole.classList.add('incorrect');
+                    
+                    // Ajouter la bonne réponse entre parenthèses
+                    const correctAnswerSpan = document.createElement('span');
+                    correctAnswerSpan.style.marginLeft = '5px';
+                    correctAnswerSpan.style.fontWeight = 'bold';
+                    correctAnswerSpan.textContent = `(${correctAnswer})`;
+                    
+                    // S'assurer qu'il n'y a pas déjà une correction
+                    const existingCorrection = hole.querySelector('.correction');
+                    if (existingCorrection) {
+                        hole.removeChild(existingCorrection);
+                    }
+                    
+                    correctAnswerSpan.className = 'correction';
+                    hole.appendChild(correctAnswerSpan);
+                }
+            });
+            
+            const scorePanel = document.getElementById('score-panel');
+            const scoreResult = document.getElementById('score-result');
+            const scorePercentage = document.getElementById('score-percentage');
+            
+            scoreResult.textContent = `Vous avez trouvé ${correct} réponse(s) correcte(s) sur ${total} trou(s).`;
+            
+            if (total > 0) {
+                const percentage = Math.round((correct / total) * 100);
+                scorePercentage.textContent = `Taux de réussite : ${percentage}%`;
+            } else {
+                scorePercentage.textContent = "Aucun trou n'a été créé.";
+            }
+            
+            scorePanel.style.display = 'block';
+        }
+        
+        // Réinitialiser tout
+        function resetAll() {
+            originalWords = [];
+            holes = [];
+            holesIndices = [];
+            document.getElementById('selection-area').innerHTML = '';
+            document.getElementById('test-area').innerHTML = '';
+            document.getElementById('score-panel').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
