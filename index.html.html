@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Texte à Trous</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .tab {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background-color: #eee;
+            cursor: pointer;
+        }
+        .tab.active {
+            background-color: #007bff;
+            color: white;
+        }
+        .hidden {
+            display: none;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .word {
+            cursor: pointer;
+            display: inline;
+        }
+        .blank {
+            background-color: #fffacd;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        .processed-text {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 15px 0;
+            background-color: white;
+            border-radius: 4px;
+        }
+        .blank-input {
+            width: 80px;
+            padding: 4px;
+            margin: 0 2px;
+            text-align: center;
+        }
+        .blank-input.correct {
+            background-color: #d4edda;
+            border-color: #28a745;
+        }
+        .blank-input.incorrect {
+            background-color: #f8d7da;
+            border-color: #dc3545;
+        }
+        button {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        button.secondary {
+            background-color: #6c757d;
+        }
+        button.success {
+            background-color: #28a745;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e9f5ff;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Application de Texte à Trous</h1>
+    
+    <div class="tabs">
+        <button id="edit-tab" class="tab active">Édition</button>
+        <button id="play-tab" class="tab">Jouer</button>
+    </div>
+    
+    <div id="edit-mode">
+        <label for="original-text">Collez votre texte ici :</label>
+        <textarea id="original-text" placeholder="Collez ou tapez votre texte ici..."></textarea>
+        
+        <div id="word-selection" class="hidden">
+            <p>Cliquez sur les mots pour créer des trous :</p>
+            <div id="processed-text" class="processed-text"></div>
+        </div>
+    </div>
+    
+    <div id="play-mode" class="hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <p>Complétez les trous :</p>
+            <div>Score: <span id="score">0</span>/<span id="total">0</span></div>
+        </div>
+        
+        <div id="play-text" class="processed-text"></div>
+        
+        <div>
+            <button id="check-btn">Vérifier</button>
+            <button id="reset-btn" class="secondary">Réinitialiser</button>
+        </div>
+        
+        <div id="result" class="result hidden">
+            <p id="result-text"></p>
+        </div>
+    </div>
+
+    <script>
+        // Éléments DOM
+        const editTab = document.getElementById('edit-tab');
+        const playTab = document.getElementById('play-tab');
+        const editMode = document.getElementById('edit-mode');
+        const playMode = document.getElementById('play-mode');
+        const originalText = document.getElementById('original-text');
+        const wordSelection = document.getElementById('word-selection');
+        const processedText = document.getElementById('processed-text');
+        const playText = document.getElementById('play-text');
+        const checkBtn = document.getElementById('check-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const scoreElement = document.getElementById('score');
+        const totalElement = document.getElementById('total');
+        const resultDiv = document.getElementById('result');
+        const resultText = document.getElementById('result-text');
+        
+        // Variables globales
+        let words = [];
+        let score = 0;
+        let totalBlanks = 0;
+        
+        // Initialiser les événements
+        function init() {
+            editTab.addEventListener('click', () => switchTab('edit'));
+            playTab.addEventListener('click', () => switchTab('play'));
+            originalText.addEventListener('input', processInput);
+            checkBtn.addEventListener('click', checkAnswers);
+            resetBtn.addEventListener('click', resetGame);
+            
+            // Désactiver l'onglet jouer au début
+            playTab.disabled = true;
+        }
+        
+        // Traiter le texte saisi
+        function processInput() {
+            const text = originalText.value.trim();
+            if (!text) {
+                wordSelection.classList.add('hidden');
+                playTab.disabled = true;
+                return;
+            }
+            
+            // Séparer le texte en mots
+            words = [];
+            const regex = /(\w+)|([^\w\s]|\s+)/g;
+            const matches = text.match(regex) || [];
+            
+            matches.forEach((match, index) => {
+                words.push({
+                    id: index,
+                    content: match,
+                    isWord: /^\w+$/.test(match),
+                    isBlank: false,
+                    userInput: '',
+                    isCorrect: null
+                });
+            });
+            
+            renderWords();
+            wordSelection.classList.remove('hidden');
+            playTab.disabled = false;
+        }
+        
+        // Afficher les mots avec possibilité de sélection
+        function renderWords() {
+            processedText.innerHTML = '';
+            
+            words.forEach(word => {
+                const span = document.createElement('span');
+                span.textContent = word.content;
+                
+                if (word.isWord) {
+                    span.classList.add('word');
+                    if (word.isBlank) {
+                        span.classList.add('blank');
+                    }
+                    
+                    span.addEventListener('click', () => toggleWord(word.id));
+                }
+                
+                processedText.appendChild(span);
+            });
+        }
+        
+        // Basculer un mot (le transformer en trou ou l'inverse)
+        function toggleWord(id) {
+            words = words.map(word => {
+                if (word.id === id && word.isWord) {
+                    return { ...word, isBlank: !word.isBlank };
+                }
+                return word;
+            });
+            
+            renderWords();
+            
+            // Vérifier s'il y a au moins un trou
+            const hasBlank = words.some(word => word.isBlank);
+            playTab.disabled = !hasBlank;
+        }
+        
+        // Changer d'onglet
+        function switchTab(tab) {
+            if (tab === 'play' && !words.some(word => word.isBlank)) {
+                alert('Veuillez sélectionner au moins un mot à transformer en trou.');
+                return;
+            }
+            
+            if (tab === 'edit') {
+                editTab.classList.add('active');
+                playTab.classList.remove('active');
+                editMode.classList.remove('hidden');
+                playMode.classList.add('hidden');
+            } else {
+                editTab.classList.remove('active');
+                playTab.classList.add('active');
+                editMode.classList.add('hidden');
+                playMode.classList.remove('hidden');
+                startGame();
+            }
+        }
+        
+        // Démarrer le jeu
+        function startGame() {
+            // Compter les trous
+            totalBlanks = words.filter(word => word.isBlank).length;
+            totalElement.textContent = totalBlanks;
+            
+            // Réinitialiser le score
+            score = 0;
+            scoreElement.textContent = score;
+            
+            renderPlayText();
+            resultDiv.classList.add('hidden');
+        }
+        
+        // Afficher le texte avec les trous à remplir
+        function renderPlayText() {
+            playText.innerHTML = '';
+            
+            words.forEach(word => {
+                if (word.isBlank) {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'blank-input';
+                    input.dataset.id = word.id;
+                    input.value = word.userInput;
+                    
+                    if (word.isCorrect === true) {
+                        input.classList.add('correct');
+                    } else if (word.isCorrect === false) {
+                        input.classList.add('incorrect');
+                    }
+                    
+                    input.addEventListener('input', e => {
+                        const wordId = parseInt(e.target.dataset.id);
+                        const value = e.target.value;
+                        
+                        words = words.map(w => {
+                            if (w.id === wordId) {
+                                return { ...w, userInput: value };
+                            }
+                            return w;
+                        });
+                    });
+                    
+                    playText.appendChild(input);
+                } else {
+                    const span = document.createElement('span');
+                    span.textContent = word.content;
+                    playText.appendChild(span);
+                }
+            });
+        }
+        
+        // Vérifier les réponses
+        function checkAnswers() {
+            let correctCount = 0;
+            
+            words = words.map(word => {
+                if (word.isBlank) {
+                    const isCorrect = word.userInput.toLowerCase() === word.content.toLowerCase();
+                    if (isCorrect) correctCount++;
+                    return { ...word, isCorrect };
+                }
+                return word;
+            });
+            
+            score = correctCount;
+            scoreElement.textContent = score;
+            
+            renderPlayText();
+            
+            // Afficher le résultat
+            const percentage = Math.round((score / totalBlanks) * 100);
+            resultText.textContent = `Résultat : ${score} sur ${totalBlanks} (${percentage}%)`;
+            resultDiv.classList.remove('hidden');
+        }
+        
+        // Réinitialiser le jeu
+        function resetGame() {
+            words = words.map(word => ({
+                ...word,
+                userInput: '',
+                isCorrect: null
+            }));
+            
+            score = 0;
+            scoreElement.textContent = score;
+            
+            renderPlayText();
+            resultDiv.classList.add('hidden');
+        }
+        
+        // Initialiser l'application
+        document.addEventListener('DOMContentLoaded', init);
+        // Appeler init immédiatement aussi, au cas où DOMContentLoaded a déjà été déclenché
+        init();
+    </script>
+</body>
+</html>
