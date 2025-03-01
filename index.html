@@ -291,6 +291,48 @@
             padding: 12px 24px;
             font-size: 18px;
         }
+        
+        /* Style pour les options de tolérance */
+        .tolerance-settings {
+            background-color: var(--instructions-bg);
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .tolerance-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .tolerance-option label {
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .tolerance-level {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .tolerance-level label {
+            font-size: 14px;
+        }
+        
+        .tolerance-level select {
+            padding: 5px 10px;
+            border-radius: var(--input-radius);
+            border: 1px solid var(--area-border);
+            background-color: var(--area-bg);
+            color: var(--text-color);
+            font-family: var(--font-family);
+        }
     </style>
 </head>
 <body>
@@ -316,6 +358,24 @@
                 <p>Copiez et collez votre texte dans la zone ci-dessous, puis cliquez sur "Charger ce texte".</p>
             </div>
             <textarea id="custom-text-area" placeholder="Copiez et collez votre texte ici..."></textarea>
+            
+            <!-- Paramètres de tolérance orthographique -->
+            <div class="tolerance-settings">
+                <h3>Paramètres de tolérance orthographique</h3>
+                <div class="tolerance-option">
+                    <input type="checkbox" id="enable-tolerance" checked>
+                    <label for="enable-tolerance">Activer la tolérance orthographique</label>
+                </div>
+                <div class="tolerance-level">
+                    <label for="tolerance-level">Niveau de tolérance:</label>
+                    <select id="tolerance-level">
+                        <option value="1">Basse (1 erreur max)</option>
+                        <option value="2" selected>Moyenne (2 erreurs max)</option>
+                        <option value="3">Haute (3 erreurs max)</option>
+                    </select>
+                </div>
+            </div>
+            
             <button onclick="loadCustomText()">Charger ce texte</button>
         </div>
         
@@ -334,6 +394,7 @@
             <div class="instructions">
                 <h3>Étape 3: Remplir les trous</h3>
                 <p>Tapez les mots manquants dans les trous. La case devient verte si la réponse est correcte, rouge si elle est incorrecte.</p>
+                <p id="tolerance-info">Tolérance orthographique: <span id="tolerance-status">Activée (2 erreurs maximum)</span></p>
             </div>
             <div id="test-area" class="text-area"></div>
             <button class="result-button" onclick="showScore()">RÉSULTAT</button>
@@ -343,7 +404,7 @@
                 <p id="score-result"></p>
                 <p id="score-percentage"></p>
                 <button onclick="resetAll()">Recommencer</button>
-            <p class="instructions-note" style="margin-top: 15px; font-style: italic;">Note: Les bonnes réponses sont affichées entre parenthèses à côté des réponses incorrectes.</p>
+                <p class="instructions-note" style="margin-top: 15px; font-style: italic;">Note: Les bonnes réponses sont affichées entre parenthèses à côté des réponses incorrectes.</p>
             </div>
         </div>
     </div>
@@ -352,6 +413,62 @@
         let originalWords = [];
         let holes = [];
         let holesIndices = [];
+        let toleranceEnabled = true;
+        let toleranceLevel = 2;
+        
+        // Fonction pour calculer la distance de Levenshtein (distance d'édition)
+        function levenshteinDistance(a, b) {
+            if (a.length === 0) return b.length;
+            if (b.length === 0) return a.length;
+            
+            const matrix = [];
+            
+            // Initialisation de la matrice
+            for (let i = 0; i <= b.length; i++) {
+                matrix[i] = [i];
+            }
+            
+            for (let j = 0; j <= a.length; j++) {
+                matrix[0][j] = j;
+            }
+            
+            // Calcul de la distance
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    const cost = a[j - 1] === b[i - 1] ? 0 : 1;
+                    
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j] + 1,       // Suppression
+                        matrix[i][j - 1] + 1,       // Insertion
+                        matrix[i - 1][j - 1] + cost // Substitution
+                    );
+                }
+            }
+            
+            return matrix[b.length][a.length];
+        }
+        
+        // Fonction pour vérifier si la réponse est acceptable selon la tolérance
+        function isAnswerAcceptable(userAnswer, correctAnswer) {
+            if (!toleranceEnabled) {
+                return userAnswer.toLowerCase() === correctAnswer.toLowerCase();
+            }
+            
+            // Conversion en minuscules pour la comparaison
+            const user = userAnswer.toLowerCase();
+            const correct = correctAnswer.toLowerCase();
+            
+            // Vérification exacte d'abord
+            if (user === correct) {
+                return true;
+            }
+            
+            // Calcul de la distance d'édition
+            const distance = levenshteinDistance(user, correct);
+            
+            // La réponse est acceptable si la distance est inférieure ou égale au niveau de tolérance
+            return distance <= toleranceLevel;
+        }
         
         // Fonction pour basculer entre les modes clair et sombre
         function toggleTheme() {
@@ -386,7 +503,31 @@
                 themeIcon.textContent = '☀️';
                 themeText.textContent = 'Mode sombre';
             }
+            
+            // Initialiser les options de tolérance
+            document.getElementById('enable-tolerance').addEventListener('change', function() {
+                toleranceEnabled = this.checked;
+                updateToleranceStatus();
+            });
+            
+            document.getElementById('tolerance-level').addEventListener('change', function() {
+                toleranceLevel = parseInt(this.value);
+                updateToleranceStatus();
+            });
+            
+            updateToleranceStatus();
         };
+        
+        // Mettre à jour l'affichage du statut de tolérance
+        function updateToleranceStatus() {
+            const toleranceStatus = document.getElementById('tolerance-status');
+            
+            if (toleranceEnabled) {
+                toleranceStatus.textContent = `Activée (${toleranceLevel} erreur${toleranceLevel > 1 ? 's' : ''} maximum)`;
+            } else {
+                toleranceStatus.textContent = 'Désactivée';
+            }
+        }
         
         // Fonction pour ouvrir un onglet
         function openTab(tabId) {
@@ -415,6 +556,12 @@
             const customText = document.getElementById('custom-text-area').value.trim();
             if (customText) {
                 resetAll();
+                
+                // Mettre à jour les options de tolérance
+                toleranceEnabled = document.getElementById('enable-tolerance').checked;
+                toleranceLevel = parseInt(document.getElementById('tolerance-level').value);
+                updateToleranceStatus();
+                
                 loadTextForSelection(customText);
                 openTab('tab2');
             } else {
@@ -581,8 +728,8 @@
             // Nettoyer les classes précédentes
             hole.classList.remove('correct', 'incorrect');
             
-            // Vérifier si la réponse est correcte
-            if (userAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
+            // Vérifier si la réponse est correcte avec tolérance
+            if (isAnswerAcceptable(userAnswer, correctAnswer)) {
                 hole.classList.add('correct');
             } else if (userAnswer) {
                 hole.classList.add('incorrect');
@@ -602,8 +749,8 @@
                 // Nettoyer les classes précédentes
                 hole.classList.remove('correct', 'incorrect');
                 
-                // Vérifier si la réponse est correcte
-                if (userAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
+                // Vérifier si la réponse est correcte avec tolérance
+                if (isAnswerAcceptable(userAnswer, correctAnswer)) {
                     hole.classList.add('correct');
                     correct++;
                 } else if (userAnswer) {
