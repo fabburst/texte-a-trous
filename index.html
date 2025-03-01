@@ -109,6 +109,7 @@
             box-shadow: var(--box-shadow);
             transition: var(--transition);
             margin-bottom: 20px;
+            box-sizing: border-box;
         }
         .tab-content.active {
             display: block;
@@ -137,6 +138,7 @@
             box-shadow: var(--box-shadow);
             font-family: var(--font-family);
             resize: vertical;
+            box-sizing: border-box; /* S'assure que le padding est inclus dans la largeur */
         }
         .word {
             cursor: pointer;
@@ -301,6 +303,7 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            box-sizing: border-box;
         }
         
         .tolerance-option {
